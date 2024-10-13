@@ -18,10 +18,24 @@ class TodoController extends Controller
      */
     public function index()
     {
-        $todos = Todo::all();
-        // $todos = auth()->user()->todos()-latest()-get();
+        $todos = auth()->user()
+            ->todos()
+            ->latest()
+            ->with('category')      // executes only 2 Querys
+            ->where(function ($query) {
+                if ($search = request()->search) {
+                    $query->where('name', 'like', '%' . $search . '%')
+                        ->orWhereHas('category', function ($query) use ($search) {
+                            $query->where('name', 'like', '%' . $search . '%');
+                        });
+                }
+            })
+            ->paginate(5)
+            ->withQueryString();
+
         return inertia('Todo/Index', [
-          'todos' => TodoResource::collection($todos)
+          'todos' => TodoResource::collection($todos),
+          'query' => (object) request()->query()
         ]);
     }
 
@@ -47,7 +61,9 @@ class TodoController extends Controller
             'description' => $request->description,
             'category_id' => $request->category_id
         ]);
-        return redirect()->route('todos.index');
+        return redirect()
+          ->route('todos.index')
+          ->with('message', 'Todo has been created successfully.');
     }
 
     /**
@@ -83,7 +99,9 @@ class TodoController extends Controller
             'description' => $request->description,
             'category_id' => $request->category_id
         ]);
-        return redirect()->route('todos.index');
+        return redirect()
+          ->route('todos.index')
+          ->with('message', 'Todo has been updated successfully.');
     }
 
     /**
@@ -92,6 +110,8 @@ class TodoController extends Controller
     public function destroy(Todo $todo)
     {
         $todo->delete();
-        return redirect()->route('todos.index');
+        return redirect()
+          ->route('todos.index')
+          ->with('message', 'Todo has been deleted successfully.');
     }
 }
